@@ -1,55 +1,50 @@
 # 1. Сборочный слой
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 
-# Добавим нужные зависимости для сборки
+# Установим нужные системные зависимости
 RUN apk add --no-cache libc6-compat python3 make g++
 
-# Установим рабочую директорию
 WORKDIR /app
 
-# Включим yarn (через corepack)
-RUN corepack enable
+# Включим Corepack и настроим yarn
+RUN corepack enable && yarn set version 3.2.3
 
-# Скопируем зависимости
-COPY package.json yarn.lock ./
+# Копируем зависимости
+COPY package.json yarn.lock .yarnrc.yml ./
 
-# Установим dev+prod зависимости
-RUN yarn install
+# Установим зависимости (в том числе создаст .yarn/install-state.gz и node_modules)
+RUN yarn install --mode=skip-build
 
-# Скопируем весь проект
+# Копируем проект
 COPY . .
 
-# Соберём Medusa проект
+# Собираем Medusa
 RUN yarn build
 
 # 2. Продакшен слой
 FROM node:20-alpine
 
-# Установим базовые зависимости
 RUN apk add --no-cache libc6-compat python3 make g++ \
-    && corepack enable
+    && corepack enable && yarn set version 3.2.3
 
 WORKDIR /app
 
-# Копируем нужные файлы из build-слоя
-COPY --from=build /app/.medusa/server ./ # Собранный сервер
-COPY --from=build /app/medusa-config.ts ./medusa-config.ts
-COPY --from=build /app/package.json ./
-COPY --from=build /app/yarn.lock ./
+# Копируем билд и всё необходимое
+COPY --from=build /app/.medusa/server ./
+COPY --from=build /app/medusa-config.js ./medusa-config.js
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/yarn.lock ./yarn.lock
 COPY --from=build /app/plugins ./plugins
 COPY --from=build /app/modules ./modules
 COPY --from=build /app/migrations ./migrations
 
-# Установим только production зависимости
+# Установка продакшн зависимостей
 RUN yarn install --production
 
-# Откроем порт (по умолчанию Medusa использует 9000)
 EXPOSE 9000
 
-# ENV по умолчанию (остальные — через Coolify)
 ENV NODE_ENV=production \
     MEDUSA_WORKER_MODE=shared \
     DISABLE_MEDUSA_ADMIN=false
 
-# Миграции и запуск сервера
-CMD yarn predeploy && yarn start
+CMD ["yarn", "predeploy"] && ["yarn", "start"]
