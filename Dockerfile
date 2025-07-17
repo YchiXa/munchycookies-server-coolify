@@ -1,41 +1,49 @@
-# 1. Build
-FROM node:20-alpine AS build
+# --- Stage 1: сборка ---
+FROM node:20-alpine AS builder
+
+# Зависимости для сборки
 RUN apk add --no-cache libc6-compat python3 make g++
+
 WORKDIR /app
-RUN corepack enable && yarn set version 3.2.3
+
+# Включаем Corepack и фиксируем версию yarn
+RUN corepack enable
+
+# Копируем файлы зависимостей и устанавливаем зависимости
 COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --mode=skip-build
+
+# Копируем всё и строим Medusa
 COPY . .
 RUN yarn build
-# Если нужен JS-конфиг:
-# RUN yarn tsc medusa-config.ts --outDir ./
 
-# 2. Production
+# --- Stage 2: запуск ---
 FROM node:20-alpine
+
 RUN apk add --no-cache libc6-compat python3 make g++ \
-    && corepack enable && yarn set version 3.2.3
+    && corepack enable
+
 WORKDIR /app
-COPY --from=build /app/.medusa/server ./medusa
-# COPY --from=build /app/medusa-config.js ./medusa-config.js
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/yarn.lock ./yarn.lock
-COPY --from=build /app/.yarn /app/.yarn
-COPY --from=build /app/.yarnrc.yml /app/.yarnrc.yml
-COPY --from=build /app/.yarn/install-state.gz /app/.yarn/install-state.gz
-COPY --from=build /app/node_modules ./node_modules
-RUN yarn medusa telemetry --disable
-# Если нужны плагины/модули/миграции — раскомментировать ниже
-# COPY --from=build /app/plugins ./plugins
-# COPY --from=build /app/modules ./modules
-# COPY --from=build /app/migrations ./migrations
+
+# Копируем основной билд и конфиги
+COPY --from=builder /app/.medusa/server ./medusa
+COPY --from=builder /app/medusa-config.js ./medusa-config.js
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/yarn.lock ./yarn.lock
+
+# Если есть папки plugins, modules, migrations – копируйте аналогично
+# COPY --from=builder /app/plugins ./plugins
+# COPY --from=builder /app/modules ./modules
+# COPY --from=builder /app/migrations ./migrations
+
+# Устанавливаем только production‑зависимости
+RUN yarn install --production
 
 EXPOSE 9000
+
 ENV NODE_ENV=production \
     MEDUSA_WORKER_MODE=shared \
     DISABLE_MEDUSA_ADMIN=false
 
-# Без повторного yarn install, если node_modules уже скопирован
-CMD ["sh", "-c", "yarn predeploy && yarn start"]
-
-# Для безопасности (опционально)
-# USER node
+# Миграции и запуск
+ENTRYPOINT ["sh", "-c", "yarn predeploy && yarn start"]
