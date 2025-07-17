@@ -12,14 +12,15 @@ RUN corepack enable && yarn set version 3.2.3
 # Копируем зависимости
 COPY package.json yarn.lock .yarnrc.yml ./
 
-# Установим зависимости (в том числе создаст .yarn/install-state.gz и node_modules)
+# Установим зависимости (создаст node_modules и .yarn/install-state.gz)
 RUN yarn install --mode=skip-build
 
-# Копируем проект
+# Копируем весь проект
 COPY . .
 
-# Собираем Medusa
+# Собираем Medusa (в .medusa/server)
 RUN yarn build
+
 
 # 2. Продакшен слой
 FROM node:20-alpine
@@ -29,16 +30,22 @@ RUN apk add --no-cache libc6-compat python3 make g++ \
 
 WORKDIR /app
 
-# Копируем билд и всё необходимое
-COPY --from=build /app/.medusa/server ./
-COPY --from=build /app/medusa-config.js ./medusa-config.js
+# Копируем собранный backend
+COPY --from=build /app/.medusa/server ./medusa
+
+# Основные файлы
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/yarn.lock ./yarn.lock
-COPY --from=build /app/plugins ./plugins
-COPY --from=build /app/modules ./modules
-COPY --from=build /app/migrations ./migrations
 
-# Установка продакшн зависимостей
+# Эти файлы и папки копируй ТОЛЬКО если они есть в проекте
+# Если не планируешь их использовать — оставь закомментированными
+
+# COPY --from=build /app/medusa-config.js ./medusa-config.js
+# COPY --from=build /app/plugins ./plugins
+# COPY --from=build /app/modules ./modules
+# COPY --from=build /app/migrations ./migrations
+
+# Установка только продакшн-зависимостей
 RUN yarn install --production
 
 EXPOSE 9000
@@ -47,4 +54,5 @@ ENV NODE_ENV=production \
     MEDUSA_WORKER_MODE=shared \
     DISABLE_MEDUSA_ADMIN=false
 
-CMD ["yarn", "predeploy"] && ["yarn", "start"]
+# Используем exec-форму команды запуска
+CMD ["yarn", "start"]
