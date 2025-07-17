@@ -37,6 +37,7 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/yarn.lock ./yarn.lock
 COPY --from=build /app/.yarn /app/.yarn
 COPY --from=build /app/.yarnrc.yml /app/.yarnrc.yml
+COPY --from=build /app/.yarn/install-state.gz /app/.yarn/install-state.gz
 # COPY --from=build /app/plugins ./plugins
 # COPY --from=build /app/modules ./modules
 # COPY --from=build /app/migrations ./migrations
