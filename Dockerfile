@@ -46,7 +46,7 @@ COPY --from=build /app/yarn.lock ./yarn.lock
 # COPY --from=build /app/migrations ./migrations
 
 # Установка только продакшн-зависимостей
-RUN yarn install --production
+RUN yarn workspaces focus --production
 
 EXPOSE 9000
 
