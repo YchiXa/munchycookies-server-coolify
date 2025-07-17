@@ -7,8 +7,9 @@ FROM node:${BASE_IMAGE_TAG} AS base
 FROM base AS deps
 
 WORKDIR /app/
-COPY package.json /app/
-RUN npm i
+COPY package.json yarn.lock .yarnrc.yml /app/
+COPY .yarn /app/.yarn
+RUN yarn install --immutable
 
 # Builder
 FROM base AS builder
