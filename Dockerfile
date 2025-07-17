@@ -1,54 +1,55 @@
 # 1. Сборочный слой
 FROM node:20-alpine as build
 
-# Поддержка OpenSSL и компиляции зависимостей
+# Добавим нужные зависимости для сборки
 RUN apk add --no-cache libc6-compat python3 make g++
 
-# Рабочая директория
+# Установим рабочую директорию
 WORKDIR /app
 
-# Установка yarn (по умолчанию в Alpine её нет)
+# Включим yarn (через corepack)
 RUN corepack enable
 
-# Копируем зависимости
+# Скопируем зависимости
 COPY package.json yarn.lock ./
 
-# Устанавливаем зависимости проекта (dev + prod)
+# Установим dev+prod зависимости
 RUN yarn install
 
-# Копируем проект
+# Скопируем весь проект
 COPY . .
 
-# Собираем Medusa-проект
+# Соберём Medusa проект
 RUN yarn build
 
-# 2. Продакшн слой
+# 2. Продакшен слой
 FROM node:20-alpine
 
-WORKDIR /app
-
+# Установим базовые зависимости
 RUN apk add --no-cache libc6-compat python3 make g++ \
     && corepack enable
 
-# Копируем production build из предыдущего слоя
-COPY --from=build /app/.medusa/server ./
-COPY --from=build /app/medusa-config.js ./medusa-config.js
+WORKDIR /app
+
+# Копируем нужные файлы из build-слоя
+COPY --from=build /app/.medusa/server ./ # Собранный сервер
+COPY --from=build /app/medusa-config.ts ./medusa-config.ts
 COPY --from=build /app/package.json ./
 COPY --from=build /app/yarn.lock ./
 COPY --from=build /app/plugins ./plugins
 COPY --from=build /app/modules ./modules
 COPY --from=build /app/migrations ./migrations
 
-# Устанавливаем только production-зависимости
+# Установим только production зависимости
 RUN yarn install --production
 
-# Открываем порт Medusa
-EXPOSE 3000
+# Откроем порт (по умолчанию Medusa использует 9000)
+EXPOSE 9000
 
-# ENV по умолчанию (все остальные задаёшь через Coolify)
+# ENV по умолчанию (остальные — через Coolify)
 ENV NODE_ENV=production \
     MEDUSA_WORKER_MODE=shared \
     DISABLE_MEDUSA_ADMIN=false
 
-# Миграции и запуск
+# Миграции и запуск сервера
 CMD yarn predeploy && yarn start
