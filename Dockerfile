@@ -9,6 +9,7 @@ FROM base AS deps
 WORKDIR /app/
 COPY package.json yarn.lock .yarnrc.yml /app/
 COPY .yarn /app/.yarn
+RUN corepack enable && corepack prepare yarn@3.2.3 --activate
 RUN yarn install --immutable
 
 # Builder
