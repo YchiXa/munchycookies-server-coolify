@@ -31,12 +31,13 @@ WORKDIR /app
 
 # Копируем билд и всё необходимое
 COPY --from=build /app/.medusa/server ./medusa
-COPY --from=build /app/medusa-config.js ./medusa-config.js
+# В проекте есть только medusa-config.ts, если нужен JS-файл, пересоберите его или используйте ts-node
+# COPY --from=build /app/medusa-config.js ./medusa-config.js
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/yarn.lock ./yarn.lock
-COPY --from=build /app/plugins ./plugins
-COPY --from=build /app/modules ./modules
-COPY --from=build /app/migrations ./migrations
+# COPY --from=build /app/plugins ./plugins
+# COPY --from=build /app/modules ./modules
+# COPY --from=build /app/migrations ./migrations
 
 # Установка только продакшн-зависимостей
 RUN NODE_ENV=production yarn install --mode=update-lockfile
